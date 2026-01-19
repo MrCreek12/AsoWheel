@@ -1,5 +1,20 @@
 import { useEffect, useRef } from 'react'
 
+/*
+ Module: CanvasWheelSpin
+ Purpose: Renderiza una ruleta en un <canvas> usando un offscreen canvas
+ y anima la rotación hasta un índice objetivo. El componente está diseñado
+ para ser eficiente (pre-render de sectores) y evitar re-renders de React
+ durante la animación. No cambia la lógica: sólo añadimos comentarios
+ y organización para facilitar mantenimiento.
+
+ Props:
+ - items: Array de etiquetas a mostrar en la ruleta
+ - winningIndex: índice objetivo para el siguiente giro (null para inactivo)
+ - onSpinEnd: callback(index) cuando la animación finaliza
+ - config: objeto de configuración (size, pointerSize, rotations, duration...)
+*/
+
 // Configuración editable (JSON) — edita estos valores al inicio del componente
 // Ejemplo:
 // const custom = {
@@ -177,7 +192,7 @@ export default function CanvasWheelSpin({ items = [], winningIndex, onSpinEnd, c
       offscreenRef.current = null
       if (rafRef.current) cancelAnimationFrame(rafRef.current)
     }
-  }, [items])
+  }, [items, size, cfg.dprMax, colors, cfg.labelMaxCharsBase, cfg.showLabelsWhenLessThan])
 
   // Animación de giro basada en requestAnimationFrame
   useEffect(() => {

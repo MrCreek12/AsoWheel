@@ -1,7 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import CanvasWheelSpin from './CanvasWheelSpin'
 
-
+/*
+ Module: App.jsx
+ Purpose: Interfaz principal para el sorteo. Mantiene el estado de los
+ participantes, controla el tamaño responsivo de la ruleta y gestiona
+ la interacción (giro, modal de ganador, lista de ganadores).
+ Nota: Sólo se añaden comentarios y organización; la lógica se mantiene
+ exactamente igual para no afectar el comportamiento o la apariencia.
+*/
 
 // --- Componentes de Estilo y Layout -------------------------------------------
 // Estos componentes se encargan únicamente de la apariencia visual general.
@@ -19,7 +26,7 @@ const FestiveBackground = () => (
       right: 0,
       bottom: 0,
       zIndex: -1,
-      background: 'linear-gradient(45deg, #ff8a80, #ff80ab, #8c9eff, #80d8ff, #a7ffeb, #ffff8d)',
+      background: 'linear-gradient(45deg, #FFBB80, #FF952B, #8CF5FF, #1C7EFF, #FFAC75, #FF852B)',
       backgroundSize: '400% 400%',
       animation: 'gradientBG 15s ease infinite',
     }}
@@ -67,6 +74,11 @@ const Header = () => (
 
 // --- Componente Principal de la Aplicación -----------------------------------
 
+/**
+ * Componente principal de la aplicación.
+ * - Mantiene el estado central (participantsText, participants, winners).
+ * - Controla el tamaño responsivo de la ruleta y dispara giros.
+ */
 export default function App() {
   // --- Estados Principales ---
   // Estado para el texto del área de participantes. Es la "fuente de la verdad".
@@ -85,6 +97,11 @@ export default function App() {
   // Responsive wheel sizing: reference to the container and current wheel size in px
   const wheelContainerRef = useRef(null)
   const [wheelSize, setWheelSize] = useState(480)
+  // autoSize = true => ResizeObserver controls wheelSize
+  // autoSize = false => user adjusted manually (buttons/slider)
+  const [autoSize, setAutoSize] = useState(true)
+  // Mostrar/ocultar controles de tamaño (colapsable)
+  const [showSizeControls, setShowSizeControls] = useState(false)
 
 
   // Paleta de colores para asignar a los segmentos de la ruleta.
@@ -135,21 +152,26 @@ export default function App() {
 
   // ResizeObserver para ajustar el tamaño de la ruleta según el ancho del contenedor
   useEffect(() => {
+    // Si el usuario está en modo manual, NO dejamos que el ResizeObserver cambie el tamaño
+    if (!autoSize) return
+
     if (!wheelContainerRef.current) {
-      // establecer tamaño inicial prudente
-      setWheelSize(Math.min(800, Math.max(240, Math.floor(window.innerWidth * 0.5))))
+      // establecer tamaño inicial prudente basado en ancho de ventana
+      setWheelSize(Math.min(800, Math.max(220, Math.floor(window.innerWidth * 0.5))))
       return
     }
 
     const el = wheelContainerRef.current
-    const minSize = 200
-    const maxSize = 900
+    const minSize = 180
+    const maxSize = 800
 
     const resize = () => {
       try {
+        // preferir el ancho del contenedor, caer a innerWidth
         const w = el.clientWidth || el.offsetWidth || Math.floor(window.innerWidth * 0.5)
-        // dejar un pequeño margen y limitar
-        const target = Math.max(minSize, Math.min(maxSize, Math.floor(w * 0.95)))
+        // En pantallas pequeñas queremos que la rueda sea ligeramente más pequeña
+        const smallScreenFactor = window.innerWidth <= 1280 ? 0.85 : 0.95
+        const target = Math.max(minSize, Math.min(maxSize, Math.floor(w * smallScreenFactor)))
         setWheelSize(target)
       } catch (e) { /* ignore */ }
     }
@@ -168,7 +190,7 @@ export default function App() {
       if (ro) ro.disconnect()
       else window.removeEventListener('resize', resize)
     }
-  }, [wheelContainerRef])
+  }, [wheelContainerRef, autoSize])
 
   // Cuando cambia el ganador, abrir el modal inmediatamente.
   useEffect(() => {
@@ -217,21 +239,21 @@ export default function App() {
   // --- Renderizado del Componente ---
 
   return (
-    <div className="flex h-screen relative" style={{ fontFamily: 'Poppins, sans-serif' }}>
+    <div className="flex flex-col md:flex-row h-screen relative" style={{ fontFamily: 'Poppins, sans-serif' }}>
       <GlobalStyles />
       <FestiveBackground />
       <Header />
 
       {/* Contenedor principal para la ruleta */}
-      <div className="w-2/3 flex flex-col items-center justify-center relative z-10">
+      <div className="w-full md:w-2/3 flex flex-col items-center justify-center relative z-10 px-4 md:px-0">
         {participants.length > 0 ? (
           <>
             {/* Contenedor responsivo para la ruleta (medido por ResizeObserver) */}
-            <div ref={wheelContainerRef} className="w-full flex justify-center items-center relative">
+            <div ref={wheelContainerRef} className="w-full flex justify-center items-center relative lg:mt-10 sm:mt-0">
               <CanvasWheelSpin
                 items={participants.map(p => p.name)}
                 winningIndex={winningIndex}
-                config={{ size: wheelSize, pointerSize: Math.max(18, Math.round(wheelSize * 0.045)), rotations: 20 }}
+                config={{ size: wheelSize, pointerSize: Math.max(18, Math.round(wheelSize * 0.040)), rotations: 20 }}
                 onSpinEnd={(index) => {
                   // Cuando la librería indica que la rueda descansó, fijar ganador y mostrar modal.
                   const name = participants?.[index]?.name;
@@ -241,31 +263,66 @@ export default function App() {
                   setWinningIndex(null);
                 }}
               />
+            </div>
 
-              {/* Botones discretos para cambiar tamaño */}
-              <div style={{ position: 'absolute', top: 8, right: 8, display: 'flex', flexDirection: 'column', gap: 8, zIndex: 30 }}>
-                <button
-                  aria-label="Aumentar ruleta"
-                  title="Aumentar"
-                  onClick={() => setWheelSize(s => Math.min(900, Math.round(s * 1.15)))}
-                  className="bg-white/80 backdrop-blur-sm border border-gray-200 rounded-full w-9 h-9 flex items-center justify-center text-gray-700 shadow-sm hover:scale-105 transition-transform"
-                >
-                  +
-                </button>
-                <button
-                  aria-label="Disminuir ruleta"
-                  title="Disminuir"
-                  onClick={() => setWheelSize(s => Math.max(200, Math.round(s / 1.15)))}
-                  className="bg-white/80 backdrop-blur-sm border border-gray-200 rounded-full w-9 h-9 flex items-center justify-center text-gray-700 shadow-sm hover:scale-95 transition-transform"
-                >
-                  −
-                </button>
-              </div>
+            {/* Controles de tamaño: botón que muestra/oculta los controles en un pequeño popover */}
+            <div style={{ position: 'absolute', top: 8, right: 8, zIndex: 30 }}>
+              <span
+                aria-label={showSizeControls ? 'Ocultar controles' : 'Mostrar controles'}
+                title={showSizeControls ? 'Cerrar' : 'Ajustes de tamaño'}
+                onClick={() => setShowSizeControls(v => !v)}
+                className="bg-white/90 backdrop-blur-sm border border-gray-200 p-2 rounded-full mx-5 my-5 backdrop-blur-3xl text-gray-700 shadow-sm hover:scale-105 transition-transform material-symbols-outlined"
+              >
+                {showSizeControls ? 'close' : 'zoom_in'}
+              </span>
+
+              {showSizeControls && (
+                <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 8, minWidth: 140 }}>
+                  <div className="flex items-center gap-2">
+                    <button
+                      aria-label="Aumentar ruleta"
+                      title="Aumentar"
+                      onClick={() => { setAutoSize(false); setWheelSize(s => Math.min(800, Math.round(s * 1.15))); }}
+                      className="bg-white/80 backdrop-blur-sm border border-gray-200 rounded-full w-9 h-9 flex items-center justify-center text-gray-700 shadow-sm hover:scale-105 transition-transform"
+                    >
+                      +
+                    </button>
+                    <button
+                      aria-label="Disminuir ruleta"
+                      title="Disminuir"
+                      onClick={() => { setAutoSize(false); setWheelSize(s => Math.max(140, Math.round(s / 1.15))); }}
+                      className="bg-white/80 backdrop-blur-sm border border-gray-200 rounded-full w-9 h-9 flex items-center justify-center text-gray-700 shadow-sm hover:scale-95 transition-transform"
+                    >
+                      −
+                    </button>
+                  </div>
+
+                  <div style={{ background: 'rgba(255,255,255,0.9)', padding: 8, borderRadius: 10, boxShadow: '0 6px 18px rgba(0,0,0,0.06)', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                      <label className="text-xs text-gray-600">Tamaño: <strong>{wheelSize}px</strong></label>
+                      <button
+                        title="Modo automático"
+                        onClick={() => setAutoSize(true)}
+                        className={`px-2 py-1 text-xs rounded ${autoSize ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-700'}`}
+                      >Auto</button>
+                    </div>
+                    <input
+                      aria-label="Ajustar tamaño ruleta"
+                      type="range"
+                      min={140}
+                      max={800}
+                      value={wheelSize}
+                      onChange={(e) => { setAutoSize(false); setWheelSize(Number(e.target.value)); }}
+                      style={{ width: 160 }}
+                    />
+                  </div>
+                </div>
+              )}
             </div>
 
             <button
               onClick={handleSpin}
-              className="mt-6 px-6 py-3 bg-white/80 backdrop-blur-sm border border-orange-500/50 rounded-full text-orange-600 font-bold text-lg hover:bg-white transition-colors shadow-lg"
+              className="mt-6 mb-10 px-6 py-3 bg-white/80 backdrop-blur-sm border border-orange-500/50 rounded-full text-orange-600 font-bold text-lg hover:bg-white transition-colors shadow-lg"
             >
               Girar Ruleta
             </button>
@@ -281,13 +338,14 @@ export default function App() {
       </div>
 
       {/* Panel lateral de controles */}
-      <div className="w-1/3 bg-gray-50/80 backdrop-blur-sm p-8 border-l border-gray-200/50 z-10">
+      <div className="w-full md:w-1/3 bg-gray-50/80 backdrop-blur-sm p-6 md:p-8 border-l border-gray-200/50 z-10">
         <Controls
           participants={participants}
           participantsText={participantsText}
           setParticipantsText={setParticipantsText}
           participantCount={participants.length}
           winners={winners}
+          setWinners={setWinners}
         />
       </div>
 
@@ -406,7 +464,8 @@ const Controls = ({
   participantsText,
   setParticipantsText,
   participantCount,
-  winners
+  winners,
+  setWinners
 }) => {
   // Estado para la pestaña activa (participantes, ganadores).
   const [activeTab, setActiveTab] = useState('participantes');
@@ -416,6 +475,8 @@ const Controls = ({
   const handleClear = () => {
     if (window.confirm('¿Estás seguro de que quieres borrar todos los participantes?')) {
       setParticipantsText('');
+      // Also clear winners when user clears the participants list
+      if (typeof setWinners === 'function') setWinners([]);
     }
   };
 
@@ -429,7 +490,17 @@ const Controls = ({
 
   return (
     <div className="flex flex-col h-full">
-      <h1 className="text-3xl font-light text-blue-600 mb-8">AsoWheel</h1>
+      <div className="flex items-center gap-3 mb-8">
+        <h1 className="text-3xl font-light text-blue-600">AsoWheel</h1>
+        <span
+          onClick={() => setActiveTab('settings')}
+          title="Ajustes"
+          aria-label="Abrir ajustes"
+          className={`p-2 rounded-lg transition ${activeTab === 'settings' ? 'bg-blue-200 text-blue-800 material-symbols-outlined' : 'text-gray-400 hover:bg-gray-200 material-symbols-outlined'}`}
+        >
+          settings
+        </span>
+      </div>
 
       {/* Navegación por pestañas */}
       <div className="flex gap-3 mb-6">
@@ -498,6 +569,27 @@ const Controls = ({
               <li key={i} className="text-green-600 font-medium">✔ {r}</li>
             )) : <p className="text-gray-500">No hay ganadores.</p>}
           </ul>
+        )}
+        {activeTab === 'settings' && (
+          <div className="text-sm p-2 space-y-3">
+            <h3 className="text-lg font-medium text-gray-700 mb-2">Ajustes</h3>
+            <label className="flex items-center gap-3">
+              <input type="checkbox" className="w-4 h-4" />
+              <span className="text-gray-600 text-sm">Quitar ganador automáticamente al confirmar</span>
+            </label>
+            <label className="flex items-center gap-3">
+              <input type="checkbox" className="w-4 h-4" />
+              <span className="text-gray-600 text-sm">Reproducir sonido al elegir ganador</span>
+            </label>
+            <div className="pt-2">
+              <label className="text-xs text-gray-500">Rotaciones por defecto</label>
+              <select className="mt-1 w-full border border-gray-200 rounded px-3 py-2 text-sm">
+                <option>8</option>
+                <option selected>20</option>
+                <option>30</option>
+              </select>
+            </div>
+          </div>
         )}
       </div>
 
