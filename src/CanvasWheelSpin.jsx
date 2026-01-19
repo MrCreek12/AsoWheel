@@ -141,7 +141,11 @@ export default function CanvasWheelSpin({ items = [], winningIndex, onSpinEnd, c
       // Inicializar etiqueta del puntero con el item actual (ángulo = 0)
       try {
         const idx = angleToIndex(0, n, anglePer)
-        if (pointerLabelRef.current) pointerLabelRef.current.textContent = items[idx] ?? ''
+        if (pointerLabelRef.current) {
+          pointerLabelRef.current.textContent = items[idx] ?? ''
+          // Ensure pointer label is hidden when wheel is at rest
+          pointerLabelRef.current.style.visibility = 'hidden'
+        }
       } catch (err) {
         // ignore
       }
@@ -169,6 +173,8 @@ export default function CanvasWheelSpin({ items = [], winningIndex, onSpinEnd, c
     const start = performance.now()
     const startAngle = 0
 
+    // Show pointer label while animating to create the 'names passing by' effect
+    if (pointerLabelRef.current) pointerLabelRef.current.style.visibility = 'visible'
     animationRef.current.running = true
 
     const easeOutCubic = (t) => 1 - Math.pow(1 - t, 3)
@@ -260,6 +266,8 @@ export default function CanvasWheelSpin({ items = [], winningIndex, onSpinEnd, c
 
         const endId = setTimeout(() => {
           try { drawHighlight(false) } catch (e) {}
+          // hide the pointer label when the wheel is at rest
+          try { if (pointerLabelRef.current) pointerLabelRef.current.style.visibility = 'hidden' } catch (e) {}
           try { onSpinEnd?.(finalIdx) } catch (err) { console.error(err) }
           blinkTimersRef.current = []
         }, blinkCount * blinkInterval + 80)
@@ -277,6 +285,8 @@ export default function CanvasWheelSpin({ items = [], winningIndex, onSpinEnd, c
         (blinkTimersRef.current || []).forEach(id => clearTimeout(id))
       } catch (e) {}
       blinkTimersRef.current = []
+      // ensure pointer label hidden when cleaning up
+      try { if (pointerLabelRef.current) pointerLabelRef.current.style.visibility = 'hidden' } catch (e) {}
     }
   }, [winningIndex, items, onSpinEnd, cfg.duration, cfg.dprMax, rotations, size])
 

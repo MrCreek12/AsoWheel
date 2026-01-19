@@ -343,12 +343,12 @@ const WinnerModal = ({ show, winner, onPresent, onClose }) => {
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
       <div
-        className="bg-white rounded-2xl p-10 w-[92%] max-w-[1200px] shadow-2xl flex gap-8 relative"
+        className="bg-white rounded-2xl px-20 py-40 w-[92%] max-w-[1000px] shadow-2xl flex gap-2 relative"
         style={{ animation: 'modalPop 600ms cubic-bezier(.2,.8,.2,1)' }}
       >
         {/* Left column: congratulations and name */}
-        <div className="flex-1 px-8 py-6">
-          <div className="text-sm text-gray-600 mb-4">¡Muchas Felicidades!</div>
+        <div className="flex-1 pl-4 pr-2.5 py-6">
+          <div className="text-sm text-gray-600 mb-4"> ¡Muchas Felicidades!</div>
           <div className="text-7xl font-extrabold leading-tight mb-8">{winner}</div>
 
           <div className="mt-6">
