@@ -70,19 +70,21 @@ const Header = () => (
 export default function App() {
   // --- Estados Principales ---
   // Estado para el texto del área de participantes. Es la "fuente de la verdad".
-  const [participantsText, setParticipantsText] = useState('Pablo\nNathan\nSofia\nJenna\nSam\nAlex');
+  const [participantsText, setParticipantsText] = useState('');
   // Estado para la lista de participantes procesada, con nombres y colores.
   const [participants, setParticipants] = useState([]);
   // Estado para almacenar el nombre del ganador actual.
   const [winner, setWinner] = useState(null);
   // Estado para controlar la visibilidad del modal del ganador.
   const [showModal, setShowModal] = useState(false);
-  // Estado para la lista de resultados (ganadores presentes).
-  const [results, setResults] = useState([]);
-  // Estado para la lista de ausentes.
-  const [absents, setAbsents] = useState([]);
+  // Estado para la lista de ganadores.
+  const [winners, setWinners] = useState([]);
 
   const [winningIndex, setWinningIndex] = useState(null);
+
+  // Responsive wheel sizing: reference to the container and current wheel size in px
+  const wheelContainerRef = useRef(null)
+  const [wheelSize, setWheelSize] = useState(480)
 
 
   // Paleta de colores para asignar a los segmentos de la ruleta.
@@ -131,6 +133,43 @@ export default function App() {
     setParticipants(newParticipants);
   }, [participantsText]); // Dependencia: se ejecuta solo si participantsText cambia.
 
+  // ResizeObserver para ajustar el tamaño de la ruleta según el ancho del contenedor
+  useEffect(() => {
+    if (!wheelContainerRef.current) {
+      // establecer tamaño inicial prudente
+      setWheelSize(Math.min(800, Math.max(240, Math.floor(window.innerWidth * 0.5))))
+      return
+    }
+
+    const el = wheelContainerRef.current
+    const minSize = 200
+    const maxSize = 900
+
+    const resize = () => {
+      try {
+        const w = el.clientWidth || el.offsetWidth || Math.floor(window.innerWidth * 0.5)
+        // dejar un pequeño margen y limitar
+        const target = Math.max(minSize, Math.min(maxSize, Math.floor(w * 0.95)))
+        setWheelSize(target)
+      } catch (e) { /* ignore */ }
+    }
+
+    resize()
+
+    let ro
+    if (window.ResizeObserver) {
+      ro = new ResizeObserver(resize)
+      ro.observe(el)
+    } else {
+      window.addEventListener('resize', resize)
+    }
+
+    return () => {
+      if (ro) ro.disconnect()
+      else window.removeEventListener('resize', resize)
+    }
+  }, [wheelContainerRef])
+
   // Cuando cambia el ganador, abrir el modal inmediatamente.
   useEffect(() => {
     if (winner) {
@@ -166,27 +205,13 @@ export default function App() {
   const handlePresent = () => {
     // Validar winner y evitar duplicados.
     if (!winner) return;
-    setResults(prev => (prev.includes(winner) ? prev : [...prev, winner])); // Añade solo si no existe.
-    // Asegurar que no quede en ausentes.
-    setAbsents(prev => prev.filter(a => a !== winner));
+    setWinners(prev => (prev.includes(winner) ? prev : [...prev, winner])); // Añade solo si no existe.
     removeWinnerFromParticipants(winner);  // Lo elimina de la lista de participantes.
     setShowModal(false);                   // Oculta el modal.
     setWinner(null);                       // Limpia el estado del ganador.
   };
 
-  /**
-   * Maneja la acción cuando el ganador es marcado como "Ausente" (o el tiempo expira).
-   */
-  const handleAbsent = () => {
-    // Validar winner y evitar duplicados.
-    if (!winner) return;
-    setAbsents(prev => (prev.includes(winner) ? prev : [...prev, winner])); // Añade solo si no existe.
-    // Asegurar que no quede en resultados.
-    setResults(prev => prev.filter(r => r !== winner));
-    removeWinnerFromParticipants(winner); // Lo elimina de la lista de participantes.
-    setShowModal(false);                  // Oculta el modal.
-    setWinner(null);                      // Limpia el estado del ganador.
-  };
+
 
 
   // --- Renderizado del Componente ---
@@ -201,20 +226,42 @@ export default function App() {
       <div className="w-2/3 flex flex-col items-center justify-center relative z-10">
         {participants.length > 0 ? (
           <>
-            {/* <CanvasWheel participants={participants} onWinner={setWinner} /> */}
-            <CanvasWheelSpin
-              items={participants.map(p => p.name)}
-              winningIndex={winningIndex}
-              config={{ size: 800, pointerSize: 36, rotations: 10}}
-              onSpinEnd={(index) => {
-                // Cuando la librería indica que la rueda descansó, fijar ganador y mostrar modal.
-                const name = participants?.[index]?.name;
-                if (name) setWinner(name);
-                setShowModal(true);
-                // Resetear para permitir futuros giros
-                setWinningIndex(null);
-              }}
-            />
+            {/* Contenedor responsivo para la ruleta (medido por ResizeObserver) */}
+            <div ref={wheelContainerRef} className="w-full flex justify-center items-center relative">
+              <CanvasWheelSpin
+                items={participants.map(p => p.name)}
+                winningIndex={winningIndex}
+                config={{ size: wheelSize, pointerSize: Math.max(18, Math.round(wheelSize * 0.045)), rotations: 20 }}
+                onSpinEnd={(index) => {
+                  // Cuando la librería indica que la rueda descansó, fijar ganador y mostrar modal.
+                  const name = participants?.[index]?.name;
+                  if (name) setWinner(name);
+                  setShowModal(true);
+                  // Resetear para permitir futuros giros
+                  setWinningIndex(null);
+                }}
+              />
+
+              {/* Botones discretos para cambiar tamaño */}
+              <div style={{ position: 'absolute', top: 8, right: 8, display: 'flex', flexDirection: 'column', gap: 8, zIndex: 30 }}>
+                <button
+                  aria-label="Aumentar ruleta"
+                  title="Aumentar"
+                  onClick={() => setWheelSize(s => Math.min(900, Math.round(s * 1.15)))}
+                  className="bg-white/80 backdrop-blur-sm border border-gray-200 rounded-full w-9 h-9 flex items-center justify-center text-gray-700 shadow-sm hover:scale-105 transition-transform"
+                >
+                  +
+                </button>
+                <button
+                  aria-label="Disminuir ruleta"
+                  title="Disminuir"
+                  onClick={() => setWheelSize(s => Math.max(200, Math.round(s / 1.15)))}
+                  className="bg-white/80 backdrop-blur-sm border border-gray-200 rounded-full w-9 h-9 flex items-center justify-center text-gray-700 shadow-sm hover:scale-95 transition-transform"
+                >
+                  −
+                </button>
+              </div>
+            </div>
 
             <button
               onClick={handleSpin}
@@ -223,13 +270,7 @@ export default function App() {
               Girar Ruleta
             </button>
 
-            {winner && (
-              <div className="mt-6 bg-green-100 border-2 border-green-500 rounded-lg px-8 py-4">
-                <p className="text-green-800 font-semibold text-lg">
-                  🎉 Ganador: <span className="font-bold text-xl">{winner}</span>
-                </p>
-              </div>
-            )}
+            {/* winner label removed per design - no inline winner tag below the wheel */}
           </>
         ) : (
           <div className="text-white text-center">
@@ -246,8 +287,7 @@ export default function App() {
           participantsText={participantsText}
           setParticipantsText={setParticipantsText}
           participantCount={participants.length}
-          results={results}
-          absents={absents}
+          winners={winners}
         />
       </div>
 
@@ -256,7 +296,6 @@ export default function App() {
         show={showModal}
         winner={winner}
         onPresent={handlePresent}
-        onAbsent={handleAbsent}
         onClose={() => setShowModal(false)}
       />
     </div>
@@ -267,61 +306,83 @@ export default function App() {
 // --- Componente del Modal del Ganador ----------------------------------------
 /**
  * Modal que aparece cuando se selecciona un ganador.
- * Contiene una cuenta regresiva y opciones para marcar como presente o ausente.
- * @param {{show: boolean, winner: string, onPresent: Function, onAbsent: Function}} props
+ * Contiene una cuenta regresiva y opciones para marcar como presente.
+ * @param {{show: boolean, winner: string, onPresent: Function, onClose: Function}} props
  */
-const WinnerModal = ({ show, winner, onPresent, onAbsent }) => {
-  const [countdown, setCountdown] = useState(10);
+const WinnerModal = ({ show, winner, onPresent, onClose }) => {
+  const [countdown, setCountdown] = useState(15);
+  const [timedOut, setTimedOut] = useState(false);
 
-  /**
-   * Efecto que maneja la cuenta regresiva del modal.
-   * Se activa cuando se muestra el modal y hay un ganador.
-   */
   useEffect(() => {
-    // No hacer nada si el modal no está visible o no hay ganador.
     if (!show || !winner) return;
 
-    // Reiniciar la cuenta regresiva.
-    setCountdown(10);
+    setCountdown(15);
+    setTimedOut(false);
 
-    // Iniciar el intervalo de la cuenta regresiva.
     const interval = setInterval(() => {
       setCountdown(prev => {
-        // Si la cuenta llega a 1, se detiene el intervalo y se marca como ausente.
         if (prev <= 1) {
           clearInterval(interval);
-          onAbsent();
+          setTimedOut(true);
           return 0;
         }
-        // Restar 1 al contador.
         return prev - 1;
       });
     }, 1000);
 
-    // Función de limpieza: se ejecuta cuando el componente se desmonta o las dependencias cambian.
     return () => clearInterval(interval);
-  }, [show, winner, onAbsent]); // Dependencias: se ejecuta si cambia alguna de estas.
+  }, [show, winner]);
 
-  // No renderizar nada si el modal no debe mostrarse.
+  // If modal should not show, render nothing
   if (!show) return null;
 
+  // Button state and label
+  const btnDisabled = timedOut;
+  const btnLabel = timedOut ? 'Sin Reclamo' : 'Confirmar Presencia';
+
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
       <div
-        className="bg-white rounded-xl p-8 w-96 text-center shadow-xl"
+        className="bg-white rounded-2xl p-10 w-[92%] max-w-[1200px] shadow-2xl flex gap-8 relative"
         style={{ animation: 'modalPop 600ms cubic-bezier(.2,.8,.2,1)' }}
       >
-        <h2 className="text-2xl font-bold mb-4">🎉 Ganador</h2>
-        <p className="text-xl font-semibold mb-4">{winner}</p>
-        <p className="text-gray-600 mb-6">
-          Tiempo restante: <span className="font-bold">{countdown}</span> segundos
-        </p>
-        <button
-          onClick={onPresent}
-          className="w-full bg-green-500 text-white py-3 rounded-lg font-semibold hover:bg-green-600 transition"
-        >
-          ✅ Presente
-        </button>
+        {/* Left column: congratulations and name */}
+        <div className="flex-1 px-8 py-6">
+          <div className="text-sm text-gray-600 mb-4">¡Muchas Felicidades!</div>
+          <div className="text-7xl font-extrabold leading-tight mb-8">{winner}</div>
+
+          <div className="mt-6">
+            <button
+              onClick={() => { if (!btnDisabled) onPresent(); }}
+              disabled={btnDisabled}
+              className={`px-6 py-3 rounded-full text-white font-semibold shadow-md transition ${btnDisabled ? 'bg-gray-300 text-gray-600 cursor-default' : 'bg-green-500 hover:bg-green-600'}`}
+            >
+              {btnLabel}
+            </button>
+          </div>
+        </div>
+
+        {/* Right column: time info */}
+        <div className="w-1/3 flex flex-col items-center justify-center px-8 py-6">
+          <div className="text-sm text-gray-600 mb-2">Tiempo:</div>
+          {!timedOut ? (
+            <div className="text-6xl font-extrabold text-black">{countdown}</div>
+          ) : (
+            <div className="text-center">
+              <div className="text-3xl font-extrabold text-red-600 mb-2">¡Se Acabó el tiempo!</div>
+              <div className="text-sm text-red-400">¡Atento al tiempo la próxima vez!</div>
+            </div>
+          )}
+        </div>
+
+        {/* Bottom-right link to continue (only visible after timeout) */}
+        <div style={{ position: 'absolute', right: 32, bottom: 28 }}>
+          {timedOut && (
+            <button onClick={onClose} className="text-sm text-gray-800 flex items-center gap-2 hover:underline">
+              Continuar con el sorteo <span style={{ transform: 'translateY(2px)' }}>→</span>
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -337,18 +398,17 @@ const WinnerModal = ({ show, winner, onPresent, onAbsent }) => {
 // --- Componente del Panel de Controles ---------------------------------------
 
 /**
- * Panel lateral para gestionar participantes, ver resultados y ausentes.
- * @param {{participantsText: string, setParticipantsText: Function, participantCount: number, results: Array<string>, absents: Array<string>}} props
+ * Panel lateral para gestionar participantes y ver ganadores.
+ * @param {{participantsText: string, setParticipantsText: Function, participantCount: number, winners: Array<string>}} props
  */
 const Controls = ({
   participants,
   participantsText,
   setParticipantsText,
   participantCount,
-  results,
-  absents
+  winners
 }) => {
-  // Estado para la pestaña activa (participantes, resultados, ausentes).
+  // Estado para la pestaña activa (participantes, ganadores).
   const [activeTab, setActiveTab] = useState('participantes');
   // Estado para el término de búsqueda.
   const [searchTerm, setSearchTerm] = useState('');
@@ -364,8 +424,7 @@ const Controls = ({
   };
 
   // Filtra las listas según el término de búsqueda.
-  const filteredResults = results.filter(r => r.toLowerCase().includes(searchTerm.toLowerCase()));
-  const filteredAbsents = absents.filter(a => a.toLowerCase().includes(searchTerm.toLowerCase()));
+  const filteredWinners = winners.filter(r => r.toLowerCase().includes(searchTerm.toLowerCase()));
   const filteredParticipants = (participants || []).filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()));
 
   return (
@@ -381,16 +440,10 @@ const Controls = ({
           Participantes <span className="bg-blue-500 text-white rounded-full px-2.5 py-0.5 ml-2 text-xs">{participantCount}</span>
         </button>
         <button
-          onClick={() => setActiveTab('resultados')}
-          className={`px-5 py-2 rounded-full text-sm font-medium transition-colors ${activeTab === 'resultados' ? 'bg-blue-200 text-blue-800' : 'text-gray-500 hover:bg-gray-200'}`}
+          onClick={() => setActiveTab('ganadores')}
+          className={`px-5 py-2 rounded-full text-sm font-medium transition-colors ${activeTab === 'ganadores' ? 'bg-blue-200 text-blue-800' : 'text-gray-500 hover:bg-gray-200'}`}
         >
-          Resultados <span className="bg-green-500 text-white rounded-full px-2.5 py-0.5 ml-2 text-xs">{results.length}</span>
-        </button>
-        <button
-          onClick={() => setActiveTab('ausentes')}
-          className={`px-5 py-2 rounded-full text-sm font-medium transition-colors ${activeTab === 'ausentes' ? 'bg-blue-200 text-blue-800' : 'text-gray-500 hover:bg-gray-200'}`}
-        >
-          Ausentes <span className="bg-red-600 text-white rounded-full px-2.5 py-0.5 ml-2 text-xs">{absents.length}</span>
+          Ganadores <span className="bg-green-500 text-white rounded-full px-2.5 py-0.5 ml-2 text-xs">{winners.length}</span>
         </button>
       </div>
 
@@ -439,18 +492,11 @@ const Controls = ({
             )}
           </>
         )}
-        {activeTab === 'resultados' && (
+        {activeTab === 'ganadores' && (
           <ul className="text-sm space-y-2 p-2">
-            {filteredResults.length > 0 ? filteredResults.map((r, i) => (
+            {filteredWinners.length > 0 ? filteredWinners.map((r, i) => (
               <li key={i} className="text-green-600 font-medium">✔ {r}</li>
-            )) : <p className="text-gray-500">No hay resultados.</p>}
-          </ul>
-        )}
-        {activeTab === 'ausentes' && (
-          <ul className="text-sm space-y-2 p-2">
-            {filteredAbsents.length > 0 ? filteredAbsents.map((a, i) => (
-              <li key={i} className="text-red-600 font-medium">✖ {a}</li>
-            )) : <p className="text-gray-500">No hay ausentes.</p>}
+            )) : <p className="text-gray-500">No hay ganadores.</p>}
           </ul>
         )}
       </div>
