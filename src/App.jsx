@@ -281,7 +281,7 @@ export default function App() {
     if (!winner) return;
     setWinners(prev => (prev.includes(winner) ? prev : [...prev, winner])); // Añade solo si no existe.
     // Mostrar notificación sutil indicando el añadido exitoso
-    setNotification(`¡${winner} agregado a ganadores!`);
+    setNotification(`¡${winner} ya es ganador!`);
     removeWinnerFromParticipants(winner);  // Lo elimina de la lista de participantes.
     setShowModal(false);                   // Oculta el modal.
     setWinner(null);                       // Limpia el estado del ganador.
