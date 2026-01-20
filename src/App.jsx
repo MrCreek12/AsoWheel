@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import CanvasWheelSpin from './CanvasWheelSpin'
+import InfoModal from './InfoModal'
 
 /*
  Module: App.jsx
@@ -122,6 +123,8 @@ export default function App() {
   const [autoSize, setAutoSize] = useState(true)
   // Mostrar/ocultar controles de tamaño (colapsable)
   const [showSizeControls, setShowSizeControls] = useState(false)
+  // Estado para mostrar el modal de información
+  const [showInfo, setShowInfo] = useState(false);
 
 
   // Paleta de colores para asignar a los segmentos de la ruleta.
@@ -281,7 +284,7 @@ export default function App() {
     if (!winner) return;
     setWinners(prev => (prev.includes(winner) ? prev : [...prev, winner])); // Añade solo si no existe.
     // Mostrar notificación sutil indicando el añadido exitoso
-    setNotification(`¡${winner} ya es ganador!`);
+    setNotification(`¡Presencia Confirmada!`);
     removeWinnerFromParticipants(winner);  // Lo elimina de la lista de participantes.
     setShowModal(false);                   // Oculta el modal.
     setWinner(null);                       // Limpia el estado del ganador.
@@ -430,6 +433,20 @@ export default function App() {
               )}
             </div>
 
+            {/* Boton de informacion, muestra un modal con la info de la app */}
+            <div style={{ position: 'absolute', bottom: 8, right: 8, zIndex: 30 }}>
+              <button
+                aria-label={'Información'}
+                title={'Información'}
+                onClick={() => { if (!isSpinning) setShowInfo(true) }}
+                role="button"
+                aria-disabled={isSpinning}
+                className="bg-white/90 backdrop-blur-sm border flex justify-center border-gray-200 p-2 rounded-full mx-5 my-5 backdrop-blur-3xl text-neutral-400 shadow-sm hover:scale-105 transition-transform "
+              >
+                <span className='material-symbols-outlined mx-0.5'>Info</span>
+              </button>
+            </div>
+
             <button
               onClick={handleSpin}
               className="mt-6 mb-10 px-6 py-3 bg-white/80 backdrop-blur-sm border border-orange-500/50 rounded-full text-orange-600 font-bold text-lg hover:bg-white transition-colors shadow-lg"
@@ -463,6 +480,8 @@ export default function App() {
       </div>
 
       {/* Modal del ganador (renderizado condicional) */}
+      <InfoModal show={showInfo} onClose={() => setShowInfo(false)} />
+
       <WinnerModal
         show={showModal}
         winner={winner}
